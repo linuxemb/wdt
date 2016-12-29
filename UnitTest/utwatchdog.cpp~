@@ -1,16 +1,4 @@
-/**********************************************************************************************************
- **
- **
- **   CONFIDENTIAL PROPERTY OF TYCO SAFETY PRODUCTS
- **
- ** File Name:WatchdogLib.cpp
- ** Project: WSA2
- ** Creation Date: Created on: Jun 5, 2015
- ** Watchdog interface libary API test program   for IPQ Watchdog Daemon
- **
- ** (c) 2015 TSP CANADA LTD, TSP CORROPOLI LTD, TSP KOREA LTD
- **
- **********************************************************************************************************/
+
 #include <iostream>
 #include <sys/types.h>
 #include <unistd.h>
