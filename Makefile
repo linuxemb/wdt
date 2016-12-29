@@ -1,97 +1,119 @@
+#******************************************************************************
 
-include ../../../include.mk
+include ../../../../include.mk
 
+# The application name.
+APPNAME = WatchdogLib 
+TEST =	WatchdogLib 
 # Application version.
 # The major.minor version is defined first. If "TESTBUILD" is defined when
 # calling "Make" then the TESTBUILD number is appended to the version.
-VERSION := 0.1
+VERSION := 1.0
 ifdef TESTBUILD
 VERSION := $(VERSION).$(TESTBUILD)
 endif
 
-# Library file names.
-BASENAME = libwatchdogapi
-SONAME = $(BASENAME).so
-LIBNAME = $(BASENAME).so.$(VERSION)
-STATICLIBNAME = $(BASENAME).a
 
-INCPATHS = ../commsAPI
-DEPENDSLIBPATH = ../commsAPI
+INCPATH = 	/usr/include/boost \
+           ../../../../OS/OAL\
+           ../
 
-INC += $(addprefix -I, $(INCPATHS))
-LIB += -L../../../OS/OAL
-LIBS = += -loal
-OPTIONS += -fpic -std=gnu++0x
+LIBSPATH = 	../../../../OS/OAL\
+		../
+LIBNAMES =  	boost_system \
+             boost_thread pthread\
+             boost_chrono boost_date_time \
+             boost_unit_test_framework\
+             oal
 
-# Make a list of all .cpp source files in the current directory.
-srcFiles = $(wildcard *.cpp)
+INC = $(addprefix -I, $(INCPATH))
+LIB = $(addprefix -L, $(LIBSPATH))
+LIBS = $(addprefix -l, $(LIBNAMES))
+RPATHCMD = -Wl,-rpath=../../../../OS/OAL
+
+ifndef OPTIONS
+OPTIONS = -Wall -Werror -Wl,--no-as-needed -fpic -std=gnu++0x $(RPATHCMD)
+else
+OPTIONS += $(RPATHCMD) -std=gnu++0x
+endif
+
+# Make list for source files
+
+srcFiles := $(wildcard *.cpp))
+          
+
 
 # Create a list of object files from the source file list.
 cpp_obj = $(addsuffix .o, $(basename $(srcFiles)))
-
 
 # Make a list of header files.
 headers = $(wildcard *.h)
 
 # Build all goals
-all:		dependlibs $(LIBNAME)
+.PHONY:	all
+all:		$(APPNAME)
 
-dependlibs:
-		make -C $(DEPENDSLIBPATH)
+.PHONE: docs
+docs:
+		$(DOXYGEN) -g doxyfile
+		$(DOXYGEN) doxyfile
 
 # Full build
-full:		clean all 
+.PHONY:	full
+full:		clean all package
 
-#test:   all
-#		make -C test
-
-install:
-		mkdir -p $(HOME)/lib
-		$(CP)  $(LIBNAME) $(STATICLIBNAME) $(HOME)/lib
-		$(LN)  -sf $(HOME)/lib/$(LIBNAME) $(HOME)/lib/$(SONAME)
 # Clean-up
+.PHONY:	clean
 clean:
 		$(RM) -f *.o
 		$(RM) -f *~
 		$(RM) -f core
-		$(RM) -f $(LIBNAME)
-		$(RM) -f $(SONAME)
-		$(RM) -f $(STATICLIBNAME)
+		$(RM) -f $(APPNAME)
 		$(RM) -f *.ipk
+		$(RM) -f version.h
 		$(RM) -fr ipk
-		$(RM) -fr protoc_middleman
-		$(RM) -fr $(protoCC) $(protoHH)
-		#make -C test clean
+		$(RM) -fr latex
+		$(RM) -fr html
 		$(RM) -f deps.out
 
-# Unit tests
-.PHONY: unittest
-unittest:
-		@echo "Unit test target."
 
-# Create an OpenWRT package.
+# Build the OpenWRT package.
+.PHONY:	package
 package:
-ifeq ($(PLATFORM),qca)
-		@echo "Empty target"
-else
-		@echo "Packages are not built for the PC target."
-endif
+		(\
+		mkdir -p $(HOME)/ipk; \
+		mkdir -p ipk/usr/bin; \
+		mkdir -p ipk/CONTROL; \
+		echo "Package: $(APPNAME)" > ipk/CONTROL/control;\
+		echo "Version: $(VERSION)" >> ipk/CONTROL/control;\
+		echo "Depends:" >> ipk/CONTROL/control;\
+		echo "Provides:" >> ipk/CONTROL/control;\
+		echo "Source: $(srcFiles)" >> ipk/CONTROL/control;\
+		echo "Section: CoreFramework" >> ipk/CONTROL/control;\
+		echo "Essential: no" >> ipk/CONTROL/control;\
+		echo "Priority: optional" >> ipk/CONTROL/control;\
+		echo "Maintainer: Tyco Developers" >> ipk/CONTROL/control;\
+		echo "Architecture: ipq806x" >> ipk/CONTROL/control;\
+		echo "Installed-Size: " >> ipk/CONTROL/control;\
+		echo "Description:  This package contains an application for local socket." \
+			 >> ipk/CONTROL/control;\
+		)
+		$(CP) $(APPNAME) ipk/usr/bin
+		$(IPKGBUILD) -c -o 0 -g 0 ipk
+#		$(CP) *.ipk $(HOME)/ipk
 
-# Create object files
-$(cpp_obj):	%.o:	%.cpp $(headers)
-		echo "const char *version=\"$(VERSION)\";" > version.h
+# Create the object files.
+$(cpp_obj):	%.o: %.cpp $(headers) version.h
 		$(GPP) $(DEFINES) $(INC) $(LIB) $(OPTIONS) -c $< -o $@
 
-$(cc_obj):	%.o:	%.cc $(headers)
+# Create the executable.
+$(APPNAME):	$(cpp_obj) $(headers)
+		$(GPP) $(DEFINES) $(INC) $(LIB) $(OPTIONS) \
+		$(cpp_obj) $(LIBS) -o $(APPNAME)
+
+# Create the version header file.
+version.h:
 		echo "const char *version=\"$(VERSION)\";" > version.h
-		$(GPP) $(DEFINES) $(INC) $(LIB) $(OPTIONS) -c $< -o $@
 
-# Create the library
-$(LIBNAME): $(cc_obj) $(cpp_obj)  $(headers)
-		echo $(srcCCFiles)
-		$(AR) -r $(STATICLIBNAME) $(cpp_obj)  $(cc_obj)
-		$(GCC) -shared -Wl,-soname,$(SONAME) $(LIB) -o $(LIBNAME) \
-			$(cpp_obj) $(cc_obj) -lc
-		$(LN) -sf $(LIBNAME) $(SONAME)
 
--include deps.out
+
